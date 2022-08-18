@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 /**
  * Retrieves the user's OAuth tokens from cookies.
@@ -6,12 +6,12 @@
  * @returns {Promise<Object>} An object with properties `accessToken`,
  * `refreshToken`, `scope`, and some others
  */
-async function getOAuthTokens (tries = 1) {
+async function getOAuthTokens(tries = 1) {
     // This function will fetch the cookie and if there is no cookie attempt to create one by visiting modmail.
     // http://stackoverflow.com/questions/20077487/chrome-extension-message-passing-response-not-sent
 
     // Grab the current token cookie
-    const cookieInfo = {url: 'https://mod.reddit.com', name: 'token'};
+    const cookieInfo = { url: "https://localhost.reddit.com", name: "token" };
     let rawCookie;
     try {
         rawCookie = await browser.cookies.get(cookieInfo);
@@ -19,7 +19,7 @@ async function getOAuthTokens (tries = 1) {
         // If first-party isolation is enabled in Firefox, `cookies.get`
         // throws when not provided a `firstPartyDomain`, so we try again
         // passing the first-party domain for the cookie we're looking for.
-        cookieInfo.firstPartyDomain = 'reddit.com';
+        cookieInfo.firstPartyDomain = "reddit.com";
         rawCookie = await browser.cookies.get(cookieInfo);
     }
 
@@ -36,7 +36,7 @@ async function getOAuthTokens (tries = 1) {
     if (validCookie) {
         // The cookie we grab has a base64 encoded string with data. Sometimes is invalid data at the end.
         // This RegExp should take care of that.
-        const base64Cookie = rawCookie.value.replace(/[^A-Za-z0-9+/].*?$/, '');
+        const base64Cookie = rawCookie.value.replace(/[^A-Za-z0-9+/].*?$/, "");
         const tokenData = atob(base64Cookie);
         return JSON.parse(tokenData);
     }
@@ -48,7 +48,7 @@ async function getOAuthTokens (tries = 1) {
     // the Reddit OAuth flow ourselves.
     if (tries < 3) {
         await makeRequest({
-            endpoint: 'https://mod.reddit.com/mail/all',
+            endpoint: "https://localhost.reddit.com/mail/all",
             absolute: true,
         });
         return getOAuthTokens(tries + 1);
@@ -56,7 +56,7 @@ async function getOAuthTokens (tries = 1) {
         // If we tried that 3 times and still no dice, the user probably isn't logged
         // into modmail, which means this trick won't work. Prompt the user to log
         // into modmail so we can get their token.
-        throw new Error('user not logged into new modmail');
+        throw new Error("user not logged into new modmail");
     }
 }
 
@@ -68,16 +68,19 @@ async function getOAuthTokens (tries = 1) {
  * constructor, serializable to plain JSON, which can be used to replicate the
  * given response.
  */
-async function serializeResponse (response) {
+async function serializeResponse(response) {
     const headers = {};
     for (const [header, value] of response.headers) {
         headers[header] = value;
     }
-    return [await response.text(), {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-    }];
+    return [
+        await response.text(),
+        {
+            status: response.status,
+            statusText: response.statusText,
+            headers,
+        },
+    ];
 }
 
 /**
@@ -86,9 +89,9 @@ async function serializeResponse (response) {
  * @param {object} parameters An object of parameters
  * @returns {string}
  */
-function queryString (parameters) {
+function queryString(parameters) {
     if (!parameters) {
-        return '';
+        return "";
     }
     const kvStrings = [];
     for (const [k, v] of Object.entries(parameters)) {
@@ -97,9 +100,9 @@ function queryString (parameters) {
         }
     }
     if (!kvStrings.length) {
-        return '';
+        return "";
     }
-    return `?${kvStrings.join('&')}`;
+    return `?${kvStrings.join("&")}`;
 }
 
 // Ratelimiter for all oauth.reddit.com requests
@@ -112,7 +115,7 @@ const oldRedditRatelimiter = new Ratelimiter();
  * @param {object} obj
  * @returns {FormData}
  */
-function makeFormData (obj) {
+function makeFormData(obj) {
     const formData = new FormData();
     for (const [key, value] of Object.entries(obj)) {
         if (value != null) {
@@ -146,7 +149,7 @@ function makeFormData (obj) {
  * @returns {Promise} Resolves to a Response object, or rejects an Error
  * @todo Ratelimit handling
  */
-async function makeRequest ({
+async function makeRequest({
     method,
     endpoint,
     query,
@@ -161,20 +164,22 @@ async function makeRequest ({
     // If we have a query object and additional parameters in the endpoint, we
     // just stick the object parameters on the end with `&` instead of `?`, and
     // duplicate keys in the final URL are fine (consistent with jQuery)
-    if (endpoint.includes('?')) {
-        query = query.replace('?', '&');
+    if (endpoint.includes("?")) {
+        query = query.replace("?", "&");
     }
-    const url = absolute ? endpoint : `https://${oauth ? 'oauth' : 'old'}.reddit.com${endpoint}${query}`;
+    const url = absolute
+        ? endpoint
+        : `https://${oauth ? "oauth" : "old"}.reddit.com${endpoint}${query}`;
 
     // Construct the options object passed to fetch()
     const fetchOptions = {
-        credentials: 'include', // required for cookies to be sent
-        redirect: 'error', // prevents strange reddit API shenanigans
+        credentials: "include", // required for cookies to be sent
+        redirect: "error", // prevents strange reddit API shenanigans
         method,
-        cache: 'no-store',
+        cache: "no-store",
     };
     if (body) {
-        if (typeof body === 'object') {
+        if (typeof body === "object") {
             // If the body is passed as an object, convert it to FormData (this
             // is needed for POST requests)
             fetchOptions.body = makeFormData(body);
@@ -187,9 +192,11 @@ async function makeRequest ({
     if (oauth) {
         try {
             const tokens = await getOAuthTokens();
-            fetchOptions.headers = {Authorization: `bearer ${tokens.accessToken}`};
+            fetchOptions.headers = {
+                Authorization: `bearer ${tokens.accessToken}`,
+            };
         } catch (error) {
-            console.error('getOAuthTokens: ', error);
+            console.error("getOAuthTokens: ", error);
             throw error;
         }
     }
@@ -206,18 +213,26 @@ async function makeRequest ({
             // Absolute URLs may hit non-Reddit domains, don't try to limit them
             response = await fetch(url, fetchOptions);
         } else if (oauth) {
-            response = await oauthRatelimiter.request(ratelimiterOptions, url, fetchOptions);
+            response = await oauthRatelimiter.request(
+                ratelimiterOptions,
+                url,
+                fetchOptions
+            );
         } else {
-            response = await oldRedditRatelimiter.request(ratelimiterOptions, url, fetchOptions);
+            response = await oldRedditRatelimiter.request(
+                ratelimiterOptions,
+                url,
+                fetchOptions
+            );
         }
     } catch (error) {
-        console.error('Fetch request failed:', error);
+        console.error("Fetch request failed:", error);
         throw error;
     }
 
     // `okOnly` means we should throw if the response has a non-2xx status
     if (okOnly && !response.ok) {
-        const error = new Error('Response returned non-2xx status code');
+        const error = new Error("Response returned non-2xx status code");
         error.response = response;
         throw error;
     }
@@ -227,18 +242,22 @@ async function makeRequest ({
 }
 
 // Makes a request and sends a reply with response and error properties
-messageHandlers.set('tb-request', requestOptions => makeRequest(requestOptions).then(
-    // For succeeded requests, we send only the raw `response`
-    async response => ({
-        response: await serializeResponse(response),
-    }),
-    // For failed requests, we send:
-    // - `error: true` to indicate the failure
-    // - `message` containing information about the error
-    // - `response` containing the raw response data (if applicable)
-    async error => ({
-        error: true,
-        message: error.message,
-        response: error.response ? await serializeResponse(error.response) : undefined,
-    }),
-));
+messageHandlers.set("tb-request", (requestOptions) =>
+    makeRequest(requestOptions).then(
+        // For succeeded requests, we send only the raw `response`
+        async (response) => ({
+            response: await serializeResponse(response),
+        }),
+        // For failed requests, we send:
+        // - `error: true` to indicate the failure
+        // - `message` containing information about the error
+        // - `response` containing the raw response data (if applicable)
+        async (error) => ({
+            error: true,
+            message: error.message,
+            response: error.response
+                ? await serializeResponse(error.response)
+                : undefined,
+        })
+    )
+);
